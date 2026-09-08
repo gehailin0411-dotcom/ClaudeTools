@@ -35,3 +35,37 @@ introducing new files, frameworks, or build tooling.
 - Before implementing any non-trivial feature, ask clarifying
   questions about scope, edge cases, and constraints first —
   don't propose a plan until you've asked.
+
+## Feature Plan
+
+Status per phase: `[ ]` not started, `[~]` in progress, `[x]` done. Mark phases
+done (or prune their detail down to a one-line summary) as they ship, so this
+section stays skimmable as the collection grows.
+
+### Phase 1 — Portal shell + Unit Converter + Regex Tester `[ ]`
+
+**Data model:** a single `TOOLS` array in the page script:
+`{ id, title, description, category }` per tool. It drives the card grid, the
+jump-links, and the category badges — adding a tool later is one array entry
+plus its `<section id="...">` and script block, nothing else.
+
+**Key flows:**
+- *Theme toggle* — read `localStorage.theme`, fall back to
+  `prefers-color-scheme`; toggle button flips the `dark` class on `<html>` and
+  persists the choice.
+- *Navigation* — hero → card grid (rendered from `TOOLS`, plus a disabled
+  "more coming soon" card) → clicking a card jump-scrolls to its `#id` section.
+- *Unit Converter* — category select (Length / Weight / Temperature / Volume)
+  → From/To unit selects → live conversion (factor-based via a common base
+  unit per category; Temperature special-cased with direct formulas).
+- *Regex Tester* — pattern + flag checkboxes (g/i/m/s) + test string →
+  `new RegExp(...)` in try/catch → live HTML-escaped `<mark>`-highlighted
+  matches, a match list with capture groups, and a replace-mode live output.
+
+### Phase 2+ — Additional tools/lessons `[ ]`
+
+Extend `TOOLS` with new entries (introduce category `"Lesson"` when the first
+one is added), each with its own `<section>` and script block, following the
+Phase 1 pattern exactly — no changes to the grid/nav/theme logic.
+
+Candidate backlog (unordered, not yet scoped): _to be filled in as decided_.

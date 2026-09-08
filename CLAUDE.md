@@ -23,3 +23,10 @@ This project has two hard constraints that must never be violated:
 
 When implementing any feature, keep everything inside `index.html` and avoid
 introducing new files, frameworks, or build tooling.
+
+## Tech stack (hard constraints — do not deviate)
+- Vanilla HTML, CSS, and JavaScript only. No React, Vue, or any JS framework.
+- Tailwind CSS for all styling (via CDN only).
+- No backend, no database. Fully static site.
+- A toggle for light and dark theme, with the choice remembered
+  across visits.

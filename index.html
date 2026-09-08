@@ -89,6 +89,7 @@
     const dark = !document.documentElement.classList.contains('dark');
     applyTheme(dark);
     localStorage.setItem('theme', dark ? 'dark' : 'light');
+    if (nacaData) drawNacaSvg(nacaData);
   });
 
   initTheme();
@@ -110,6 +111,14 @@
       description: 'Test regex patterns with live match highlighting and capture groups.',
       category: 'Tool',
       icon: '<path d="M8 4L4 12l4 8M16 4l4 8-4 8"/>'
+    },
+    {
+      id: 'naca-airfoil',
+      title: 'NACA Airfoil Visualizer',
+      description: 'Plot a NACA 4-digit airfoil from its code, with camber line, key stats, and coordinate export.',
+      category: 'Tool',
+      icon: '<path d="M3 13c2.5-4.5 9-6.5 16-4.5-1.5 1-1.5 3 0 4-7 3-13.5 1.5-16 .5z"/>',
+      sectionBody: nacaAirfoilBodyHTML
     }
   ];
 
@@ -145,6 +154,9 @@
   }
 
   function sectionHTML(tool) {
+    const body = tool.sectionBody
+      ? tool.sectionBody()
+      : `<p class="text-sm leading-relaxed" style="color:var(--text-muted)">This tool's logic hasn't been built yet — this section exists to prove the open/close pattern works. Real functionality lands in a later phase.</p>`;
     return `
       <section id="tool-${tool.id}" hidden class="rounded-2xl p-8 mb-6 shadow-md" style="background:var(--card-bg);">
         <div class="flex items-start justify-between gap-4 mb-4">
@@ -158,13 +170,217 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
-        <p class="text-sm leading-relaxed" style="color:var(--text-muted)">This tool's logic hasn't been built yet — this section exists to prove the open/close pattern works. Real functionality lands in a later phase.</p>
+        ${body}
       </section>
     `;
   }
 
+  // ---- NACA Airfoil Visualizer ----
+  // 4-digit series only: code MPXX -> max camber M (%c), camber position P
+  // (tenths of chord), max thickness XX (%c). Standard textbook formulas,
+  // cosine-spaced stations, open (non-zero-gap) trailing edge.
+  function nacaAirfoilBodyHTML() {
+    return `
+      <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-end gap-6">
+          <div>
+            <label for="naca-code" class="block text-xs font-bold mb-1" style="color:var(--text-muted)">NACA CODE</label>
+            <input id="naca-code" type="text" inputmode="numeric" maxlength="4" value="2412"
+              class="w-24 rounded-lg border-2 px-3 py-2 text-center font-display text-lg font-bold"
+              style="border-color:var(--border-muted); background:var(--bg); color:var(--text);">
+          </div>
+          <div class="flex-1 min-w-[160px]">
+            <label for="naca-camber" class="block text-xs font-bold mb-1" style="color:var(--text-muted)">MAX CAMBER — <span id="naca-camber-val">2%</span></label>
+            <input id="naca-camber" type="range" min="0" max="9" value="2" class="w-full">
+          </div>
+          <div class="flex-1 min-w-[160px]">
+            <label for="naca-pos" class="block text-xs font-bold mb-1" style="color:var(--text-muted)">CAMBER POSITION — <span id="naca-pos-val">0.4c</span></label>
+            <input id="naca-pos" type="range" min="0" max="9" value="4" class="w-full">
+          </div>
+          <div class="flex-1 min-w-[160px]">
+            <label for="naca-thickness" class="block text-xs font-bold mb-1" style="color:var(--text-muted)">MAX THICKNESS — <span id="naca-thickness-val">12%</span></label>
+            <input id="naca-thickness" type="range" min="1" max="40" value="12" class="w-full">
+          </div>
+        </div>
+        <p class="text-xs" style="color:var(--text-muted)">4-digit series only. Camber position only takes effect when max camber is above 0%.</p>
+
+        <svg id="naca-svg" viewBox="0 0 1000 460" class="w-full rounded-xl" style="background:var(--bg);"></svg>
+
+        <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+          <div><span style="color:var(--text-muted)">Max thickness:</span> <span id="naca-thickness-stat" class="font-bold"></span></div>
+          <div id="naca-camber-stat-row"><span style="color:var(--text-muted)">Max camber:</span> <span id="naca-camber-stat" class="font-bold"></span></div>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <h3 class="font-display font-bold">Coordinates</h3>
+          <button id="naca-download" type="button"
+            class="text-xs font-bold text-white px-3 py-1.5 rounded-full cursor-pointer"
+            style="background:var(--accent)">Download CSV</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <div class="text-xs font-bold mb-1" style="color:var(--text-muted)">UPPER SURFACE</div>
+            <div class="rounded-lg border-2 overflow-y-auto font-mono text-xs" style="border-color:var(--border-muted); max-height:200px;">
+              <table class="w-full"><tbody id="naca-upper-table"></tbody></table>
+            </div>
+          </div>
+          <div>
+            <div class="text-xs font-bold mb-1" style="color:var(--text-muted)">LOWER SURFACE</div>
+            <div class="rounded-lg border-2 overflow-y-auto font-mono text-xs" style="border-color:var(--border-muted); max-height:200px;">
+              <table class="w-full"><tbody id="naca-lower-table"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function computeNacaAirfoil(mPct, pTenths, tPct, n) {
+    const m = mPct / 100, p = pTenths / 10, t = tPct / 100;
+    const upper = [], lower = [], camber = [];
+    let maxThickness = { value: 0, x: 0 };
+    let maxCamberPt = { value: 0, x: 0 };
+
+    for (let i = 0; i <= n; i++) {
+      const beta = Math.PI * i / n;
+      const x = (1 - Math.cos(beta)) / 2;
+      const yt = 5 * t * (0.2969 * Math.sqrt(x) - 0.1260 * x - 0.3516 * x ** 2 + 0.2843 * x ** 3 - 0.1015 * x ** 4);
+      if (yt > maxThickness.value) maxThickness = { value: yt, x };
+
+      let yc = 0, dyc = 0;
+      if (m > 0 && p > 0) {
+        if (x < p) {
+          yc = (m / (p * p)) * (2 * p * x - x * x);
+          dyc = (2 * m / (p * p)) * (p - x);
+        } else {
+          yc = (m / ((1 - p) * (1 - p))) * ((1 - 2 * p) + 2 * p * x - x * x);
+          dyc = (2 * m / ((1 - p) * (1 - p))) * (p - x);
+        }
+      }
+      if (yc > maxCamberPt.value) maxCamberPt = { value: yc, x };
+
+      const theta = Math.atan(dyc);
+      upper.push([x - yt * Math.sin(theta), yc + yt * Math.cos(theta)]);
+      lower.push([x + yt * Math.sin(theta), yc - yt * Math.cos(theta)]);
+      camber.push([x, yc]);
+    }
+
+    return { upper, lower, camber, maxThickness, maxCamberPt };
+  }
+
+  let nacaData = null;
+
+  function renderNacaAirfoil() {
+    const camberSlider = document.getElementById('naca-camber');
+    const posSlider = document.getElementById('naca-pos');
+    const thicknessSlider = document.getElementById('naca-thickness');
+    const codeInput = document.getElementById('naca-code');
+
+    const m = Number(camberSlider.value);
+    const p = Number(posSlider.value);
+    const t = Number(thicknessSlider.value);
+
+    document.getElementById('naca-camber-val').textContent = m + '%';
+    document.getElementById('naca-pos-val').textContent = (p / 10).toFixed(1) + 'c';
+    document.getElementById('naca-thickness-val').textContent = t + '%';
+    codeInput.value = `${m}${p}${String(t).padStart(2, '0')}`;
+
+    nacaData = computeNacaAirfoil(m, p, t, 80);
+
+    document.getElementById('naca-thickness-stat').textContent =
+      `${(nacaData.maxThickness.value * 200).toFixed(1)}% at ${(nacaData.maxThickness.x * 100).toFixed(0)}%c`;
+
+    const camberStatRow = document.getElementById('naca-camber-stat-row');
+    if (m > 0 && p > 0) {
+      camberStatRow.hidden = false;
+      document.getElementById('naca-camber-stat').textContent =
+        `${(nacaData.maxCamberPt.value * 100).toFixed(1)}% at ${(nacaData.maxCamberPt.x * 100).toFixed(0)}%c`;
+    } else {
+      camberStatRow.hidden = true;
+    }
+
+    drawNacaSvg(nacaData);
+    fillNacaTables(nacaData);
+  }
+
+  function drawNacaSvg(data) {
+    const svg = document.getElementById('naca-svg');
+    const W = 1000, H = 460, marginX = 40, marginY = 40;
+
+    let yMax = 0.001;
+    [...data.upper, ...data.lower, ...data.camber].forEach(([, y]) => {
+      yMax = Math.max(yMax, Math.abs(y));
+    });
+    yMax *= 1.15;
+
+    const scale = Math.min((W - 2 * marginX) / 1, (H - 2 * marginY) / (2 * yMax));
+    const xOffset = (W - scale) / 2;
+    const yCenter = H / 2;
+    const toX = x => xOffset + x * scale;
+    const toY = y => yCenter - y * scale;
+
+    const outline = [...data.upper, ...[...data.lower].reverse()];
+    const outlinePath = 'M ' + outline.map(([x, y]) => `${toX(x).toFixed(1)},${toY(y).toFixed(1)}`).join(' L ') + ' Z';
+    const camberPath = 'M ' + data.camber.map(([x, y]) => `${toX(x).toFixed(1)},${toY(y).toFixed(1)}`).join(' L ');
+    const hasCamber = data.camber.some(([, y]) => y !== 0);
+
+    const style = getComputedStyle(document.documentElement);
+    const accent = style.getPropertyValue('--accent').trim();
+    const textMuted = style.getPropertyValue('--text-muted').trim();
+
+    svg.innerHTML = `
+      <line x1="${toX(0)}" y1="${toY(0)}" x2="${toX(1)}" y2="${toY(0)}" stroke="${textMuted}" stroke-width="1" stroke-dasharray="4 4" />
+      <path d="${outlinePath}" fill="${accent}" fill-opacity="0.18" stroke="${accent}" stroke-width="2.5" />
+      ${hasCamber ? `<path d="${camberPath}" fill="none" stroke="${accent}" stroke-width="1.5" stroke-dasharray="6 4" />` : ''}
+    `;
+  }
+
+  function fillNacaTables(data) {
+    const rowHTML = ([x, y]) => `<tr><td class="px-2 py-0.5">${x.toFixed(4)}</td><td class="px-2 py-0.5">${y.toFixed(4)}</td></tr>`;
+    document.getElementById('naca-upper-table').innerHTML = data.upper.map(rowHTML).join('');
+    document.getElementById('naca-lower-table').innerHTML = data.lower.map(rowHTML).join('');
+  }
+
+  function downloadNacaCsv() {
+    if (!nacaData) return;
+    const lines = ['surface,x,y'];
+    nacaData.upper.forEach(([x, y]) => lines.push(`upper,${x.toFixed(6)},${y.toFixed(6)}`));
+    nacaData.lower.forEach(([x, y]) => lines.push(`lower,${x.toFixed(6)},${y.toFixed(6)}`));
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `naca-${document.getElementById('naca-code').value}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function initNacaAirfoil() {
+    const codeInput = document.getElementById('naca-code');
+    const camberSlider = document.getElementById('naca-camber');
+    const posSlider = document.getElementById('naca-pos');
+    const thicknessSlider = document.getElementById('naca-thickness');
+
+    [camberSlider, posSlider, thicknessSlider].forEach(el => el.addEventListener('input', renderNacaAirfoil));
+
+    codeInput.addEventListener('input', () => {
+      const digits = codeInput.value.replace(/\D/g, '').slice(0, 4);
+      codeInput.value = digits;
+      if (digits.length !== 4) return;
+      camberSlider.value = digits[0];
+      posSlider.value = digits[1];
+      thicknessSlider.value = Math.min(40, Math.max(1, Number(digits.slice(2))));
+      renderNacaAirfoil();
+    });
+
+    document.getElementById('naca-download').addEventListener('click', downloadNacaCsv);
+
+    renderNacaAirfoil();
+  }
+
   document.getElementById('tool-grid').innerHTML = TOOLS.map(cardHTML).join('') + comingSoonCardHTML();
   document.getElementById('tool-sections').innerHTML = TOOLS.map(sectionHTML).join('');
+  initNacaAirfoil();
 
   // ---- Open/close ----
   function openTool(id) {

@@ -65,10 +65,19 @@ and the tool sections — adding a tool later is one array entry plus its own
   `new RegExp(...)` in try/catch → live HTML-escaped `<mark>`-highlighted
   matches, a match list with capture groups, and a replace-mode live output.
 
-### Phase 2+ — Additional tools/lessons `[ ]`
+### Phase 2+ — Additional tools/lessons `[~]`
 
 Extend `TOOLS` with new entries (introduce category `"Lesson"` when the first
 one is added), each with its own `<section>` and script block, following the
 Phase 1 pattern exactly — no changes to the grid/nav/theme logic.
+
+- [x] *NACA Airfoil Visualizer* — one `TOOLS` entry (`sectionBody` points at its
+  own markup function, same extension point as `sectionHTML()`'s placeholder
+  fallback). 4-digit series only: a code field (e.g. `2412`) synced two-way with
+  Max Camber / Camber Position / Max Thickness sliders → cosine-spaced-station
+  computation of the camber line and thickness distribution → live SVG outline
+  + camber line overlay, chord line, max-thickness/max-camber stats, an
+  upper/lower coordinate table, and a CSV download. Confirms the Phase 1
+  pattern held: no grid/nav/theme changes were needed to add it.
 
 Candidate backlog (unordered, not yet scoped): _to be filled in as decided_.

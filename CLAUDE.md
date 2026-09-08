@@ -42,23 +42,26 @@ Status per phase: `[ ]` not started, `[~]` in progress, `[x]` done. Mark phases
 done (or prune their detail down to a one-line summary) as they ship, so this
 section stays skimmable as the collection grows.
 
-### Phase 1 — Portal shell + Unit Converter + Regex Tester `[ ]`
+### Phase 1 — Portal shell + Unit Converter + Regex Tester `[~]`
 
 **Data model:** a single `TOOLS` array in the page script:
-`{ id, title, description, category }` per tool. It drives the card grid, the
-jump-links, and the category badges — adding a tool later is one array entry
-plus its `<section id="...">` and script block, nothing else.
+`{ id, title, description, category, icon }` per tool. It drives the card grid
+and the tool sections — adding a tool later is one array entry plus its own
+`sectionHTML()`-rendered content, nothing else to wire up.
 
 **Key flows:**
-- *Theme toggle* — read `localStorage.theme`, fall back to
+- [x] *Theme toggle* — read `localStorage.theme`, fall back to
   `prefers-color-scheme`; toggle button flips the `dark` class on `<html>` and
   persists the choice.
-- *Navigation* — hero → card grid (rendered from `TOOLS`, plus a disabled
-  "more coming soon" card) → clicking a card jump-scrolls to its `#id` section.
-- *Unit Converter* — category select (Length / Weight / Temperature / Volume)
+- [x] *Navigation* — hero → card grid (rendered from `TOOLS`, plus a disabled
+  "more coming soon" card) → clicking a card opens its `#tool-<id>` section
+  (hides any other open one, scrolls it into view); a close button on the
+  section hides it again. Proven with placeholder sections for Unit Converter
+  and Regex Tester (no real tool logic yet).
+- [ ] *Unit Converter* — category select (Length / Weight / Temperature / Volume)
   → From/To unit selects → live conversion (factor-based via a common base
   unit per category; Temperature special-cased with direct formulas).
-- *Regex Tester* — pattern + flag checkboxes (g/i/m/s) + test string →
+- [ ] *Regex Tester* — pattern + flag checkboxes (g/i/m/s) + test string →
   `new RegExp(...)` in try/catch → live HTML-escaped `<mark>`-highlighted
   matches, a match list with capture groups, and a replace-mode live output.
 
